@@ -1,25 +1,102 @@
-from flask import Flask, render_template, request, redirect
+import sqlite3
+from flask import Flask, render_template, request, redirect, url_for
 
 app = Flask(__name__)
+DATABASE = "planner.db"
 
-shifts = [
-    {"date": "2026-11-28", "start": "09:00", "end": "17:00"},
-    {"date": "2026-11-30", "start": "16:00", "end": "22:00"},
-]
+EVENT_TYPES = ["class", "shift", "deadline", "exam", "personal"]
+DAYS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]
+
+
+def get_db():
+    conn = sqlite3.connect(DATABASE)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON")  # SQLite needs this to enforce links between tables
+    return conn
+
+
+def init_db():
+    conn = get_db()
+    conn.executescript("""
+        CREATE TABLE IF NOT EXISTS courses (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            code TEXT NOT NULL,
+            name TEXT,
+            colour TEXT NOT NULL DEFAULT '#3788d8'
+        );
+
+        CREATE TABLE IF NOT EXISTS events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            type TEXT NOT NULL CHECK (type IN ('class', 'shift', 'deadline', 'exam', 'personal')),
+            course_id INTEGER REFERENCES courses(id),
+            date TEXT NOT NULL,
+            start_time TEXT,
+            end_time TEXT,
+            repeat_days TEXT,
+            repeat_until TEXT,
+            done INTEGER NOT NULL DEFAULT 0
+        );
+    """)
+    conn.commit()
+    conn.close()
+
+
+init_db()
+
 
 @app.route("/")
 def home():
-    return render_template("index.html", shifts=shifts)
+    conn = get_db()
+    courses = conn.execute("SELECT * FROM courses ORDER BY code").fetchall()
+    events = conn.execute("""
+        SELECT events.*, courses.code AS course_code
+        FROM events
+        LEFT JOIN courses ON events.course_id = courses.id
+        ORDER BY date, start_time
+    """).fetchall()
+    conn.close()
+    return render_template(
+        "index.html", courses=courses, events=events,
+        event_types=EVENT_TYPES, days=DAYS,
+    )
 
-@app.route("/add", methods=["POST"])
-def add_shift():
-    new_shift = {
-        "date": request.form["date"],
-        "start": request.form["start"],
-        "end": request.form["end"],
-    }
-    shifts.append(new_shift)
-    return redirect("/")
+
+@app.route("/courses/add", methods=["POST"])
+def add_course():
+    conn = get_db()
+    conn.execute(
+        "INSERT INTO courses (code, name, colour) VALUES (?, ?, ?)",
+        (request.form["code"], request.form.get("name") or None, request.form["colour"]),
+    )
+    conn.commit()
+    conn.close()
+    return redirect(url_for("home"))
+
+
+@app.route("/events/add", methods=["POST"])
+def add_event():
+    repeat_days = ",".join(request.form.getlist("repeat_days")) or None
+
+    conn = get_db()
+    conn.execute("""
+        INSERT INTO events
+            (title, type, course_id, date, start_time, end_time, repeat_days, repeat_until)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        request.form["title"],
+        request.form["type"],
+        request.form.get("course_id") or None,
+        request.form["date"],
+        request.form.get("start_time") or None,
+        request.form.get("end_time") or None,
+        repeat_days,
+        request.form.get("repeat_until") or None,
+    ))
+    conn.commit()
+    conn.close()
+    return redirect(url_for("home"))
+
 
 @app.route("/calendar")
 def calendar():

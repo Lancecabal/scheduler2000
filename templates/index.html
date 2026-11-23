@@ -1,19 +1,71 @@
 {% extends "base.html" %}
 
 {% block content %}
-    <h1>My Shifts</h1>
+    <h1>Shift Planner</h1>
 
-    <ul>
-    {% for shift in shifts %}
-        <li>{{ shift.date }}: {{ shift.start_time }} to {{ shift.end_time }}</li>
-    {% endfor %}
-    </ul>
+    <h2>All Events</h2>
+    {% if events %}
+    <table border="1" cellpadding="6">
+        <tr>
+            <th>Date</th><th>Time</th><th>Type</th><th>Course</th><th>Title</th><th>Repeats</th>
+        </tr>
+        {% for e in events %}
+        <tr>
+            <td>{{ e.date }}</td>
+            <td>{{ e.start_time or "" }}{% if e.end_time %}–{{ e.end_time }}{% endif %}</td>
+            <td>{{ e.type }}</td>
+            <td>{{ e.course_code or "" }}</td>
+            <td>{{ e.title }}</td>
+            <td>
+                {% if e.repeat_days %}{{ e.repeat_days }} until {{ e.repeat_until }}{% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+    {% else %}
+        <p>No events yet. Add one below.</p>
+    {% endif %}
 
-    <h2>Add a Shift</h2>
-    <form method="POST" action="/add">
-        <label>Date: <input type="date" name="date" required></label>
-        <label>Start: <input type="time" name="start" required></label>
-        <label>End: <input type="time" name="end" required></label>
-        <button type="submit">Add Shift</button>
+    <h2>Add an Event</h2>
+    <form method="POST" action="{{ url_for('add_event') }}">
+        <p>
+            <label>Type:
+                <select name="type" required>
+                    {% for t in event_types %}
+                        <option value="{{ t }}">{{ t }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label>Title: <input type="text" name="title" placeholder="e.g. Lecture, Shift, A2" required></label>
+            <label>Course:
+                <select name="course_id">
+                    <option value="">(none)</option>
+                    {% for c in courses %}
+                        <option value="{{ c.id }}">{{ c.code }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+        </p>
+        <p>
+            <label>Date (first date if repeating): <input type="date" name="date" required></label>
+            <label>Start / due time: <input type="time" name="start_time"></label>
+            <label>End time: <input type="time" name="end_time"></label>
+        </p>
+        <p>
+            Repeats on:
+            {% for d in days %}
+                <label><input type="checkbox" name="repeat_days" value="{{ d }}"> {{ d }}</label>
+            {% endfor %}
+            <label>until <input type="date" name="repeat_until"></label>
+        </p>
+        <button type="submit">Add Event</button>
+    </form>
+
+    <h2>Add a Course</h2>
+    <form method="POST" action="{{ url_for('add_course') }}">
+        <label>Code: <input type="text" name="code" placeholder="CSC 360" required></label>
+        <label>Name: <input type="text" name="name" placeholder="Operating Systems"></label>
+        <label>Colour: <input type="color" name="colour" value="#3788d8"></label>
+        <button type="submit">Add Course</button>
     </form>
 {% endblock %}

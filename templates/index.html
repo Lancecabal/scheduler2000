@@ -1,15 +1,19 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Shift Planner</title>
-</head>
-<body>
+{% extends "base.html" %}
+
+{% block content %}
     <h1>My Shifts</h1>
 
     <ul>
     {% for shift in shifts %}
-        <li>{{ shift.date }}: {{ shift.start }} to {{ shift.end }}</li>
+        <li>{{ shift.date }}: {{ shift.start_time }} to {{ shift.end_time }}</li>
     {% endfor %}
     </ul>
-</body>
-</html>
+
+    <h2>Add a Shift</h2>
+    <form method="POST" action="/add">
+        <label>Date: <input type="date" name="date" required></label>
+        <label>Start: <input type="time" name="start" required></label>
+        <label>End: <input type="time" name="end" required></label>
+        <button type="submit">Add Shift</button>
+    </form>
+{% endblock %}

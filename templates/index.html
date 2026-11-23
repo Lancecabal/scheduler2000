@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Shift Planner</title>
+</head>
+<body>
+    <h1>My Shifts</h1>
+
+    <ul>
+    {% for shift in shifts %}
+        <li>{{ shift.date }}: {{ shift.start }} to {{ shift.end }}</li>
+    {% endfor %}
+    </ul>
+</body>
+</html>

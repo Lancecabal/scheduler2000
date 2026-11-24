@@ -1,5 +1,7 @@
 import sqlite3
 from flask import Flask, render_template, request, redirect, url_for
+from datetime import date, timedelta
+from schedule import occurrences_between, countdown
 
 app = Flask(__name__)
 DATABASE = "planner.db"
@@ -56,8 +58,26 @@ def home():
         ORDER BY date, start_time
     """).fetchall()
     conn.close()
+
+    today = date.today()
+    week_end = today + timedelta(days=6)
+
+    # Everything happening in the next 7 days (recurring classes expanded)
+    agenda = occurrences_between(events, today, week_end)
+
+    # Unfinished deadlines and exams due within 7 days, including overdue ones
+    due_soon = []
+    for e in events:
+        if e["type"] in ("deadline", "exam") and not e["done"]:
+            due_date = date.fromisoformat(e["date"])
+            if due_date <= week_end:
+                item = dict(e)
+                item["countdown"] = countdown(due_date, today)
+                due_soon.append(item)
+
     return render_template(
         "index.html", courses=courses, events=events,
+        agenda=agenda, due_soon=due_soon,
         event_types=EVENT_TYPES, days=DAYS,
     )
 
@@ -101,3 +121,11 @@ def add_event():
 @app.route("/calendar")
 def calendar():
     return render_template("calendar.html")
+
+@app.route("/events/<int:event_id>/toggle-done", methods=["POST"])
+def toggle_done(event_id):
+    conn = get_db()
+    conn.execute("UPDATE events SET done = 1 - done WHERE id = ?", (event_id,))
+    conn.commit()
+    conn.close()
+    return redirect(url_for("home"))
